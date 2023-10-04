@@ -1,0 +1,125 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <chrono>
+
+using namespace std;
+using namespace chrono;
+
+// Data structure to represent a shift
+struct Shift {
+    string date;
+    string startTime;
+    string endTime;
+};
+
+// Data structure to represent an employee
+struct Employee {
+    string name;
+    string position;
+    vector<Shift> shifts;
+};
+
+// Function to check if an employee has worked for 7 consecutive days
+bool hasWorkedFor7ConsecutiveDays(const vector<Shift>& shifts) {
+    int consecutiveDays = 0;
+    string prevDate;
+
+    for (const Shift& shift : shifts) {
+        if (prevDate.empty()) {
+            prevDate = shift.date;
+            consecutiveDays = 1;
+        } else {
+            if (shift.date == prevDate) {
+                continue;  // Skip shifts on the same day
+            }
+            auto prevDateTime = system_clock::from_time_t(stoi(prevDate));
+            auto currentDateTime = system_clock::from_time_t(stoi(shift.date));
+            auto dayDifference = duration_cast<days>(currentDateTime - prevDateTime).count();
+
+            if (dayDifference == 1) {
+                consecutiveDays++;
+                if (consecutiveDays == 7) {
+                    return true;
+                }
+            } else {
+                consecutiveDays = 1;
+            }
+
+            prevDate = shift.date;
+        }
+    }
+
+    return false;
+}
+
+// Function to analyze and print employee data based on criteria
+void analyzeEmployeeData(const string& filePath) {
+    ifstream inputFile(filePath);
+    if (!inputFile.is_open()) {
+        cout << "File not found." << endl;
+        return;
+    }
+
+    map<string, Employee> employees;
+
+    string line;
+    getline(inputFile, line); // Skip header line
+
+    while (getline(inputFile, line)) {
+        stringstream ss(line);
+        string employeeId, name, position, shiftDate, startTime, endTime;
+
+        getline(ss, employeeId, ',');
+        getline(ss, name, ',');
+        getline(ss, position, ',');
+        getline(ss, shiftDate, ',');
+        getline(ss, startTime, ',');
+        getline(ss, endTime);
+
+        employees[employeeId].name = name;
+        employees[employeeId].position = position;
+        employees[employeeId].shifts.push_back({shiftDate, startTime, endTime});
+    }
+
+    for (const auto& pair : employees) {
+        const Employee& employee = pair.second;
+
+        if (hasWorkedFor7ConsecutiveDays(employee.shifts)) {
+            cout << employee.name << " (" << employee.position << ") has worked for 7 consecutive days." << endl;
+        }
+
+        for (size_t i = 0; i < employee.shifts.size() - 1; i++) {
+            const Shift& currentShift = employee.shifts[i];
+            const Shift& nextShift = employee.shifts[i + 1];
+
+            auto currentStartTime = stoi(currentShift.endTime.substr(0, 2));
+            auto nextStartTime = stoi(nextShift.startTime.substr(0, 2));
+
+            if (nextStartTime - currentStartTime < 10 && nextStartTime - currentStartTime > 1) {
+                cout << employee.name << " (" << employee.position << ") has less than 10 hours between shifts on " << currentShift.date << "." << endl;
+            }
+        }
+
+        for (const Shift& shift : employee.shifts) {
+            auto startHour = stoi(shift.startTime.substr(0, 2));
+            auto endHour = stoi(shift.endTime.substr(0, 2));
+
+            if (endHour - startHour > 14) {
+                cout << employee.name << " (" << employee.position << ") has worked for more than 14 hours on " << shift.date << "." << endl;
+            }
+        }
+    }
+
+    inputFile.close();
+}
+
+int main() {
+    string filePath = "employee_shifts.csv"; // Replace with the actual path to your input file
+    analyzeEmployeeData(filePath);
+
+    return 0;
+}
